@@ -1,0 +1,42 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+generator client {
+  provider = "prisma-client-js"
+  output   = "../generated/prisma"
+}
+
+datasource db {
+  provider = "sqlserver"
+  url      = env("DATABASE_URL")
+}
+
+model users {
+  user_id  String @id @default(uuid())
+  user_email String @db.VarChar(100)
+  user_password String @db.VarChar(255)
+  user_urls short_url[]
+  user_created_at DateTime @db.DateTime
+}
+
+model short_url {
+  url_id String @id @default(uuid())
+  url_short_id String @unique
+  url_original String @db.Text
+  url_user users @relation(fields: [url_user_id], references: [user_id])
+  url_user_id String
+  url_clicks click[]
+  url_created_at DateTime @db.DateTime
+}
+
+model click {
+  click_id String @id @default(uuid())
+  click_short_url short_url @relation(fields: [click_short_url_id], references: [url_short_id])
+  click_short_url_id String
+  click_timestamp DateTime @default(now())
+  click_ip_address String @db.VarChar(200)
+  click_user_agent String @db.VarChar(255)
+}
