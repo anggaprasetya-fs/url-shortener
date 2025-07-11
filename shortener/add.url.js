@@ -27,6 +27,22 @@ export async function addUrl(payload, url) { // payload from validating JWT Toke
     return add
 }
 
+export async function getUrl(payload) {
+    const get = await prisma.short_url.findMany({
+        where: {
+            url_user_id: {
+                equals: payload.user_id
+            }
+        }
+    })
+
+    const allData = get.map(item => ({
+        ...item,
+        url_short_id: process.env.APP_URL + item.url_short_id
+    }))
+    return allData
+}
+
 async function checkSlug(slug){
     const check = await prisma.short_url.findMany({
         where: {

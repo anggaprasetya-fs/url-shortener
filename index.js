@@ -4,7 +4,7 @@ import { z } from "zod";
 import { login } from './auth/login';
 import { jwtVerify } from 'jose';
 import "./config/log.conf.js"
-import { addUrl } from './shortener/add.url.js';
+import { addUrl, getUrl } from './shortener/add.url.js';
 
 const defaultHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -133,11 +133,54 @@ Bun.serve({
         }
         const newUrl = process.env.APP_URL+add.url_short_id
         appLog.info(`Success to shorten URL, new URL : ${newUrl}`, { status: 200 })
-        return new Response(JSON.stringify({ message: `Successfull shorten URL`, url: newUrl }), { status: 200, headers: defaultHeaders })
+        return new Response(JSON.stringify({ message: `Success shorten URL`, url: newUrl }), { status: 200, headers: defaultHeaders })
 
       },
       OPTIONS: () => new Response(null, { status: 204, headers: defaultHeaders })
-    }
+    },
+    "/api/get/url": {
+      POST: async (req) => {
+        const request = {
+          token: req.headers.get("Authorization").split(" ")[1]
+        }
+
+        if (!request.token) {
+          appLog.info(`Value for both token and url doesn't exist`, { code: 500 })
+          return new Response(
+            JSON.stringify({
+              message: "Token not supplied",
+              error: validation.error,
+            }),
+            { 
+              status: 500, 
+              headers: defaultHeaders
+            }
+          );
+        }
+
+        appLog.info(`JWT Token trapped from the client`, { code: 200 })
+        const { payload } = await jwtVerify(request.token, secret)
+
+        if (!payload) {
+          appLog.error(`JWT Token error or expired`, { status: 401 })
+          return new Response(JSON.stringify({ message: `JWT Token error or expired`}, { status: 401, headers: defaultHeaders }))
+        }
+
+        appLog.info(`JWT Token ${request.token} valid with secret`, { status: 200 })
+        const get = await getUrl(payload)
+        
+        if (!get) {
+          appLog.error(`Failed to shorten url`, { status: 500 })
+          return new Response(JSON.stringify({ message: `Failed to get all shorten url` }), { status: 500, headers: defaultHeaders })
+        }
+
+        const newUrl = get
+        appLog.info(`Success to get all shorten URL, total : ${newUrl.length}`, { status: 200 })
+        return new Response(JSON.stringify({ message: `Success to get all shorten URL`, url: newUrl }), { status: 200, headers: defaultHeaders })
+
+      },
+      OPTIONS: () => new Response(null, { status: 204, headers: defaultHeaders })
+    },
   },
   fetch: (req, server) => {
     if (req.method === "OPTIONS") {
