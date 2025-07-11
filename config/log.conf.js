@@ -12,6 +12,11 @@ await configure({
             category: 'login',
             lowestLevel: 'debug',
             sinks: ['console', 'file']
+        },
+        {
+            category: 'app',
+            lowestLevel: 'debug',
+            sinks: ['console', 'file']
         }
     ]
 })
