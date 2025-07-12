@@ -4,7 +4,7 @@ import { z } from "zod";
 import { login } from './auth/login';
 import { jwtVerify } from 'jose';
 import "./config/log.conf.js"
-import { addUrl, getUrl } from './shortener/add.url.js';
+import { addUrl, deleteUrl, getUrl } from './shortener/url.js';
 
 const defaultHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -79,7 +79,7 @@ Bun.serve({
             }
           } catch (error) {
             loginLog.error(`Username ${request.username} try to login but invalid credential!`, {code: 401})
-            return new Response(JSON.stringify({ message: 'Invalid crendetials' }), {
+            return new Response(JSON.stringify({ status: 401, message: 'Invalid crendetials' }), {
               status: 401,
               headers: defaultHeaders
             }); 
@@ -98,9 +98,10 @@ Bun.serve({
         }
 
         if (!request.token || !request.url) {
-          appLog.info(`Value for both token and url doesn't exist`, { code: 500 })
+          appLog.info(`Value for both token and url doesn't exist`, { code: 400 })
           return new Response(
             JSON.stringify({
+              status: 400,
               message: "Token and url data not supplied",
               error: validation.error,
             }),
@@ -116,24 +117,24 @@ Bun.serve({
         
         if (!request.url.startsWith("http://") && !request.url.startsWith("https://") && !request.url.startsWith("www.")) {
           appLog.error(`URL not start with http/https/www`, { status: 400 })
-          return new Response("URL must start with http/https/www", { status: 400, headers: defaultHeaders });
+          return new Response(JSON.stringify({ status: 400, message: "URL must start with http/https/www" }), { status: 400, headers: defaultHeaders });
         }
 
         if (!payload) {
           appLog.error(`JWT Token error or expired`, { status: 401 })
-          return new Response(JSON.stringify({ message: `JWT Token error or expired`}, { status: 401, headers: defaultHeaders }))
+          return new Response(JSON.stringify({ status: 401, message: `JWT Token error or expired`}, { status: 401, headers: defaultHeaders }))
         }
 
         appLog.info(`JWT Token ${request.token} valid with secret`, { status: 200 })
         const add = await addUrl(payload, request.url)
         
         if (!add) {
-          appLog.error(`Failed to shorten url`, { status: 500 })
-          return new Response(JSON.stringify({ message: `Failed to shorten url` }), { status: 500, headers: defaultHeaders })
+          appLog.error(`Failed to shorten url`, { status: 404 })
+          return new Response(JSON.stringify({ status: 404, message: `Failed to shorten url` }), { status: 500, headers: defaultHeaders })
         }
         const newUrl = process.env.APP_URL+add.url_short_id
         appLog.info(`Success to shorten URL, new URL : ${newUrl}`, { status: 200 })
-        return new Response(JSON.stringify({ message: `Success shorten URL`, url: newUrl }), { status: 200, headers: defaultHeaders })
+        return new Response(JSON.stringify({ status: 200, message: `Success shorten URL`, url: newUrl }), { status: 200, headers: defaultHeaders })
 
       },
       OPTIONS: () => new Response(null, { status: 204, headers: defaultHeaders })
@@ -145,9 +146,10 @@ Bun.serve({
         }
 
         if (!request.token) {
-          appLog.info(`Value for both token and url doesn't exist`, { code: 500 })
+          appLog.info(`Value for both token and url doesn't exist`, { code: 400 })
           return new Response(
             JSON.stringify({
+              status: 400,
               message: "Token not supplied",
               error: validation.error,
             }),
@@ -163,20 +165,75 @@ Bun.serve({
 
         if (!payload) {
           appLog.error(`JWT Token error or expired`, { status: 401 })
-          return new Response(JSON.stringify({ message: `JWT Token error or expired`}, { status: 401, headers: defaultHeaders }))
+          return new Response(JSON.stringify({ status: 401, message: `JWT Token error or expired`}, { status: 401, headers: defaultHeaders }))
         }
 
         appLog.info(`JWT Token ${request.token} valid with secret`, { status: 200 })
         const get = await getUrl(payload)
         
         if (!get) {
-          appLog.error(`Failed to shorten url`, { status: 500 })
-          return new Response(JSON.stringify({ message: `Failed to get all shorten url` }), { status: 500, headers: defaultHeaders })
+          appLog.error(`Failed to shorten url`, { status: 404 })
+          return new Response(JSON.stringify({ status: 404, message: `Failed to get all shorten url` }), { status: 404, headers: defaultHeaders })
         }
 
         const newUrl = get
         appLog.info(`Success to get all shorten URL, total : ${newUrl.length}`, { status: 200 })
-        return new Response(JSON.stringify({ message: `Success to get all shorten URL`, url: newUrl }), { status: 200, headers: defaultHeaders })
+        return new Response(JSON.stringify({ status: 200, message: `Success to get all shorten URL`, url: newUrl }), { status: 200, headers: defaultHeaders })
+
+      },
+      OPTIONS: () => new Response(null, { status: 204, headers: defaultHeaders })
+    },
+    "/api/delete/url": {
+      POST: async (req) => {
+        const body = await req.json();
+        const token = req.headers.get("Authorization").split(" ")[1]
+        const request = {
+          url_id: body.url_id
+        }
+
+        if (!token || !request.url_id) {
+          appLog.info(`Value for both token and url doesn't exist`, { code: 400 })
+          return new Response(
+            JSON.stringify({
+              status: 400,
+              message: "Token and url data not supplied"
+            }),
+            { 
+              status: 400, 
+              headers: defaultHeaders
+            }
+          );
+        }
+
+        appLog.info(`JWT Token trapped from the client`, { code: 200 })
+        const { payload } = await jwtVerify(token, secret)
+
+        const urlIdValidation = z.object({
+          url_id: z.string().length(36, { message: "Must be exactly 36 characters long!" }).uuid({ message: "Invalid UUID" })
+        });
+
+        const validation = urlIdValidation.safeParse(request)
+
+        if (!validation.success) {
+          appLog.error(`URL UUID invalid`)
+          return new Response(JSON.stringify({ status: 411, message: validation.error.issues[0].message }, { status: 411, headers: defaultHeaders }))
+        }
+
+        if (!payload) {
+          appLog.error(`JWT Token error or expired`, { status: 401 })
+          return new Response(JSON.stringify({ status: 401, message: `JWT Token error or expired`}, { status: 401, headers: defaultHeaders }))
+        }
+
+        appLog.info(`JWT Token ${token} valid with secret`, { status: 200 })
+        const remove = await deleteUrl(request.url_id)
+        
+        if (remove.error) {
+          appLog.error(`Failed to remove url`, { status: 404 })
+          return new Response(JSON.stringify({ status: 404, message: remove.error.message }), { status: 404, headers: defaultHeaders })
+        }
+        
+        appLog.info(`Success to remove URL`, { status: 200 })
+        return new Response(JSON.stringify({ status: 200, message: `Success remove URL`, url_id: remove.url_id}), { status: 200, headers: defaultHeaders })
 
       },
       OPTIONS: () => new Response(null, { status: 204, headers: defaultHeaders })
