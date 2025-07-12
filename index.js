@@ -228,7 +228,7 @@ Bun.serve({
         const remove = await deleteUrl(request.url_id)
         
         if (remove.error) {
-          appLog.error(`Failed to remove URL: ${get.error.code} ${get.error.message}`, { status: 404 })
+          appLog.error(`Failed to remove URL: ${remove.error.code} ${remove.error.message}`, { status: 404 })
           return new Response(JSON.stringify({ status: 404, message: remove.error.message }), { status: 404, headers: defaultHeaders })
         }
         
@@ -238,7 +238,7 @@ Bun.serve({
       },
       OPTIONS: () => new Response(null, { status: 204, headers: defaultHeaders })
     },
-    "/:slug": async req => {
+    "/s/:slug": async req => {
       const body = {
         slug: req.params.slug,
         ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("cf-connecting-ip") || "unknown",
@@ -264,7 +264,13 @@ Bun.serve({
       }
 
       appLog.info(`Success to get original URL, redirecting to ${get}`, { status: 200 })
-      return Response.redirect(get)
+      return Response.redirect(get, 302)
+    },
+    "/docs" : req => {
+      return new Response(Bun.file("./docs/swagger.html"), { headers: defaultHeaders })
+    },
+    "/docs/openapi.json" : req => {
+      return new Response(Bun.file("./docs/openapi.json"), { headers: defaultHeaders })
     }
   },
   fetch: (req, server) => {

@@ -1,0 +1,234 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "URL Shortener API",
+    "version": "1.0.0",
+    "description": "API documentation for the Bun-based URL Shortener service."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:{port}",
+      "variables": {
+        "port": {
+          "default": "3000"
+        }
+      }
+    }
+  ],
+  "paths": {
+    "/api/system/status": {
+      "get": {
+        "summary": "Get server and service status",
+        "responses": {
+          "200": {
+            "description": "Server is running",
+            "content": {
+              "text/plain": {
+                "schema": { "type": "string" }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/auth/login": {
+      "post": {
+        "summary": "User login",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "username": { "type": "string", "format": "email" },
+                  "password": { "type": "string" }
+                },
+                "required": ["username", "password"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Login successful and returned some user data with JWT token 1 day period.",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" },
+                    "token": { "type": "string" },
+                    "user_name": { "type": "string" },
+                    "user_fullname": { "type": "string" },
+                    "user_id": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "[Bad Request] Validation error"
+          },
+          "401": {
+            "description": "[Unauthorized] Invalid credentials"
+          }
+        }
+      }
+    },
+    "/api/add/url": {
+      "post": {
+        "summary": "Add a new short URL",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url": { "type": "string" }
+                },
+                "required": ["url"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Short URL created",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "integer" },
+                    "message": { "type": "string" },
+                    "url": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "[Bad Request] Missing token or url" },
+          "401": { "description": "[Unauthorized] JWT error" },
+          "404": { "description": "[Not Found] Failed to shorten url" }
+        }
+      }
+    },
+    "/api/get/url": {
+      "post": {
+        "summary": "Get all short URLs for a user",
+        "security": [{ "bearerAuth": [] }],
+        "responses": {
+          "200": {
+            "description": "List of short URLs",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "integer" },
+                    "message": { "type": "string" },
+                    "url": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "url_short_id": { "type": "string" },
+                          "url_original": { "type": "string" },
+                          "url_user_id": { "type": "string" },
+                          "url_created_at": { "type": "string", "format": "date-time" },
+                          "url_id": { "type": "string" }
+                        }
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "[Bad Request] Missing token" },
+          "401": { "description": "[Unauthorized] JWT error" },
+          "404": { "description": "[Not Found] Failed to get URLs" }
+        }
+      }
+    },
+    "/api/delete/url": {
+      "post": {
+        "summary": "Delete a short URL",
+        "security": [{ "bearerAuth": [] }],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "url_id": { "type": "string", "format": "uuid" }
+                },
+                "required": ["url_id"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "URL deleted",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "status": { "type": "integer" },
+                    "message": { "type": "string" },
+                    "url_id": { "type": "string" }
+                  }
+                }
+              }
+            }
+          },
+          "400": { "description": "[Bad Request] Missing token or url_id" },
+          "401": { "description": "[Unauthorized] JWT error" },
+          "404": { "description": "[Not Found] URL not found" }
+        }
+      }
+    },
+    "/s/{slug}": {
+      "get": {
+        "summary": "Redirect to original URL",
+        "parameters": [
+          {
+            "name": "slug",
+            "in": "path",
+            "required": true,
+            "schema": { "type": "string", "maxLength": 7 }
+          }
+        ],
+        "responses": {
+          "302": {
+            "description": "[Found] Redirect to original URL",
+            "headers": {
+                "Location": {
+                    "description": "You will be redirected to original URL in real HTTP request, not in swagger",
+                    "schema": { "type": "string", "format": "uri" }
+                }
+            }
+          },
+          "404": {
+            "description": "[Not Found] Slug not found"
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  }
+}
