@@ -1,6 +1,7 @@
 import { DateTime } from "luxon";
 import { PrismaClient } from "../generated/prisma";
 import { customAlphabet } from "nanoid";
+import { PrismaClientKnownRequestError } from "../generated/prisma/runtime/library";
 
 const prisma = new PrismaClient()
 const now = DateTime.local().setZone("Asia/Jakarta").toUTC()
@@ -41,6 +42,31 @@ export async function getUrl(payload) {
         url_short_id: process.env.APP_URL + item.url_short_id
     }))
     return allData
+}
+
+export async function deleteUrl(url_id) {
+    try {
+        const remove = await prisma.short_url.delete({
+            where: {
+                url_id: url_id
+            }
+        })
+
+        return remove
+    } catch (err) {
+        
+        if (err instanceof PrismaClientKnownRequestError) {
+            switch (err.code) {
+                case 'P2025':
+                    return { error: { code: err.code, message: "URL id not found" } }
+                    break;
+            
+                default:
+                    return { error: { code: 0, message: "Query failed" } }
+                    break;
+            }
+        }
+    }
 }
 
 async function checkSlug(slug){
