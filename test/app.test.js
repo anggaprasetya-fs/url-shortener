@@ -36,6 +36,6 @@ describe('Adding URL to be shorted', () => {
         })
         
         expect(response.status).toBe(200)
-        expect(await response.json()).toContainValue('Successfull shorten URL')
+        expect(await response.json()).toContainValue('Success shorten URL')
     })
 })
