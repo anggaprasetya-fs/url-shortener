@@ -98,7 +98,7 @@ To run this project, you will need to add the following environment variables to
 
 ## 📟 Installation
 
-Install url-shortener with [bun](https://bun.sh)
+Install url-shortener with [Bun](https://bun.sh)
 
 ```bash
   git clone https://github.com/username/url-shortener.git
