@@ -1,10 +1,10 @@
 // import './log/logtape.log.js'
 import { getLogger } from '@logtape/logtape'
-import { z } from "zod";
+import { Schema, z } from "zod";
 import { login } from './auth/login';
 import { jwtVerify } from 'jose';
 import "./config/log.conf.js"
-import { addUrl, deleteUrl, getUrl } from './shortener/url.js';
+import { addUrl, deleteUrl, getOriginalUrl, getUrl } from './shortener/url.js';
 
 const defaultHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -228,7 +228,7 @@ Bun.serve({
         const remove = await deleteUrl(request.url_id)
         
         if (remove.error) {
-          appLog.error(`Failed to remove url`, { status: 404 })
+          appLog.error(`Failed to remove URL: ${get.error.code} ${get.error.message}`, { status: 404 })
           return new Response(JSON.stringify({ status: 404, message: remove.error.message }), { status: 404, headers: defaultHeaders })
         }
         
@@ -238,6 +238,34 @@ Bun.serve({
       },
       OPTIONS: () => new Response(null, { status: 204, headers: defaultHeaders })
     },
+    "/:slug": async req => {
+      const body = {
+        slug: req.params.slug,
+        ip: req.headers.get("x-forwarded-for")?.split(",")[0]?.trim() || req.headers.get("cf-connecting-ip") || "unknown",
+        userAgent: req.headers.get("user-agent") || "unknown"
+      }
+
+      const slugValidation = z.object({
+        slug: z.string().max(7, "Slug length exceed")
+      })
+
+      const validation = slugValidation.safeParse(body)
+
+      if (!validation) {
+        appLog.error(`Invalid slug combination`)
+        return new Response(JSON.stringify({ status: 400, message: validation.error }), { status: 400, headers: defaultHeaders })
+      }
+
+      const get = await getOriginalUrl(body.slug, body.ip, body.userAgent)
+      
+      if (get.error) {
+        appLog.error(`Failed to get original URL: ${get.error.code} ${get.error.message}`)
+        return new Response(JSON.stringify({ status: 404, message: get.error.message }), { status: 404, headers: defaultHeaders })
+      }
+
+      appLog.info(`Success to get original URL, redirecting to ${get}`, { status: 200 })
+      return Response.redirect(get)
+    }
   },
   fetch: (req, server) => {
     if (req.method === "OPTIONS") {
