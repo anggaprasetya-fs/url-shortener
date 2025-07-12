@@ -34,7 +34,7 @@ model short_url {
 
 model click {
   click_id String @id @default(uuid())
-  click_short_url short_url @relation(fields: [click_short_url_id], references: [url_short_id])
+  click_short_url short_url @relation(fields: [click_short_url_id], references: [url_id])
   click_short_url_id String
   click_timestamp DateTime @default(now())
   click_ip_address String @db.VarChar(200)

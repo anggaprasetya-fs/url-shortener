@@ -62,11 +62,60 @@ export async function deleteUrl(url_id) {
                     break;
             
                 default:
-                    return { error: { code: 0, message: "Query failed" } }
+                    return { error: { code: err.code, message: "Query failed" } }
                     break;
             }
         }
     }
+}
+
+export async function getOriginalUrl(slug, ipaddr, userAgent) {
+    try {
+        const getOriginal = await prisma.short_url.findFirst({
+            where: {
+                url_short_id: {
+                    equals: slug
+                }
+            }
+        })
+
+        if (!getOriginal) {
+            return { error: { code: 'P2025', message: "URL not found" } }
+        }
+
+        const addClick = await clickUrl(getOriginal.url_id, ipaddr, userAgent)
+
+        if (!addClick.click_id) {
+            return { error: { code: err.code, message: "URL click cannot be inserted" } }
+        }
+        
+        return getOriginal.url_original
+    } catch (err) {
+        if (err instanceof PrismaClientKnownRequestError) {
+            switch (err.code) {
+                case 'P42025':
+                    return { error: { code: err.code, message: "URL not found" } }
+                    break;
+            
+                default:
+                    return { error: { code: err.code, message: "Query failed" } }
+                    break;
+            }
+        }
+    }
+}
+
+async function clickUrl(url_id, ipaddr, userAgent) {
+    const click = await prisma.click.create({
+        data: {
+            click_short_url_id: url_id,
+            click_timestamp: localTime,
+            click_ip_address: ipaddr,
+            click_user_agent: userAgent
+        }
+    })
+
+    return click
 }
 
 async function checkSlug(slug){
